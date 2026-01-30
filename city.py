@@ -19,9 +19,36 @@ class City:
         self.grid_positions = {}  # Store grid coordinates for each node
         self.roads = {}  # Store road information
         self.image_positions = image_positions  # New: positions from uploaded image
+        self.weather = 'Clear'
         self._build_city()
         self._initialize_roadworks()
         self._identify_roads()
+
+    def set_weather(self, weather):
+        if weather == self.weather:
+            return
+            
+        self.weather = weather
+        print(f"[DEBUG] Weather changed to {weather}")
+        
+        # Always reset roadworks to base level when weather changes
+        self.roadworks.clear()
+        self._initialize_roadworks()
+        
+        # Adjust roadworks for Heatwave
+        if weather == 'Heatwave':
+            # Add more roadworks (increase by 50%)
+            self._add_more_roadworks()
+
+    def _add_more_roadworks(self):
+        """Add additional roadworks for Heatwave"""
+        non_subway_edges = [edge for edge in self.graph.edges() 
+                           if not self.graph.get_edge_data(edge[0], edge[1]).get('is_subway', False)]
+        # Add 5% more
+        num_new = max(1, len(non_subway_edges) // 20)
+        new_edges = random.sample(non_subway_edges, num_new)
+        for edge in new_edges:
+            self.roadworks.add(tuple(sorted(edge)))
 
     def _build_city(self):
         if self.image_positions:
@@ -514,6 +541,10 @@ class City:
         for i in range(len(path) - 1):
             edge_data = self.graph.get_edge_data(path[i], path[i+1])
             total_time += edge_data.get('weight', 5)
+            
+        if self.weather == 'Snow':
+            return total_time * 2
+            
         return total_time
 
     def is_roadworks(self, edge):

@@ -39,6 +39,11 @@ class Person:
         
         # 1. Travel along existing path
         if self.current_path and self.current_index < len(self.current_path) - 1:
+            # Snow effect: Doubled transit time (move only 50% of the time)
+            # Since time increments by 5, current_time % 10 will alternate 0, 5.
+            if self.city.weather == 'Snow' and current_time % 10 != 0:
+                return
+
             # Check for congestion on next edge
             current_node = self.current_path[self.current_index]
             next_node = self.current_path[self.current_index + 1]
@@ -47,8 +52,11 @@ class Person:
             edge_key = tuple(sorted([current_node, next_node]))
             traffic_count = getattr(self, '_current_traffic', {}).get(edge_key, 0)
             
-            # Apply congestion delay if traffic > 5
-            if traffic_count > 5:
+            # Apply congestion delay
+            # Rain effect: Increased effects of congestion (lower threshold)
+            congestion_threshold = 3 if self.city.weather == 'Rain' else 5
+            
+            if traffic_count > congestion_threshold:
                 self.congestion_delay = 1  # Wait one extra tick
                 return
             
