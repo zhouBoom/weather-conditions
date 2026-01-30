@@ -1,9 +1,10 @@
 import networkx as nx
 import random
 import math
+from weather import WeatherSystem
 
 class City:
-    def __init__(self, home_count=40, work_count=20, subway_count=5, image_positions=None):
+    def __init__(self, home_count=40, work_count=20, subway_count=5, image_positions=None, city_name="City"):
         self.graph = nx.Graph()
         self.home_nodes = []
         self.work_nodes = []
@@ -19,6 +20,8 @@ class City:
         self.grid_positions = {}  # Store grid coordinates for each node
         self.roads = {}  # Store road information
         self.image_positions = image_positions  # New: positions from uploaded image
+        self.city_name = city_name
+        self.weather = WeatherSystem(city_name)  # New: weather system
         self._build_city()
         self._initialize_roadworks()
         self._identify_roads()
@@ -493,6 +496,30 @@ class City:
         roadwork_edges = random.sample(non_subway_edges, num_roadworks)
         for edge in roadwork_edges:
             self.roadworks.add(tuple(sorted(edge)))
+    
+    def update_weather(self, current_time):
+        """Update weather conditions and apply weather effects"""
+        self.weather.update(current_time)
+        
+        # Apply weather effects to roadworks
+        non_subway_edges = [edge for edge in self.graph.edges() 
+                           if not self.graph.get_edge_data(edge[0], edge[1]).get('is_subway', False)]
+        
+        # Heatwaves increase roadworks
+        if self.weather.should_add_roadworks() and non_subway_edges:
+            # Add new roadworks
+            available_edges = [edge for edge in non_subway_edges 
+                             if tuple(sorted(edge)) not in self.roadworks]
+            if available_edges:
+                new_roadwork = random.choice(available_edges)
+                self.roadworks.add(tuple(sorted(new_roadwork)))
+                print(f"[WEATHER] {self.city_name}: New roadworks added due to {self.weather.current_weather}")
+        
+        # Rain can remove roadworks (work stops)
+        if self.weather.should_remove_roadworks() and self.roadworks:
+            removed_roadwork = random.choice(list(self.roadworks))
+            self.roadworks.remove(removed_roadwork)
+            print(f"[WEATHER] {self.city_name}: Roadworks removed")
 
     def get_path(self, start, end):
         """Get shortest path avoiding roadworks, considering edge weights"""
@@ -507,14 +534,19 @@ class City:
             return None
     
     def get_path_time(self, path):
-        """Calculate total travel time for a path"""
+        """Calculate total travel time for a path, considering weather effects"""
         if not path or len(path) < 2:
             return 0
         total_time = 0
+        weather_multiplier = self.weather.get_transit_time_multiplier()
+        
         for i in range(len(path) - 1):
             edge_data = self.graph.get_edge_data(path[i], path[i+1])
-            total_time += edge_data.get('weight', 5)
-        return total_time
+            base_time = edge_data.get('weight', 5)
+            # Apply weather effects (snow doubles time, rain increases by 30%)
+            total_time += base_time * weather_multiplier
+        
+        return int(total_time)
 
     def is_roadworks(self, edge):
         """Check if an edge has roadworks"""
