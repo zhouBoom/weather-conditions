@@ -217,7 +217,7 @@ def handle_start_simulation(data):
                     return
 
             city = City(home_count=homes, work_count=works, subway_count=subways, 
-                       image_positions=image_grid_positions)
+                       image_positions=image_grid_positions, city_name=city_name)
             people = generate_people(city)
 
             simulation_counter += 1
@@ -294,4 +294,4 @@ def handle_get_active_cities():
     emit('active_cities_list', {'cities': cities})
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
+    socketio.run(app, debug=True, host='0.0.0.0', port=5002)

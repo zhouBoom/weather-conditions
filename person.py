@@ -47,8 +47,13 @@ class Person:
             edge_key = tuple(sorted([current_node, next_node]))
             traffic_count = getattr(self, '_current_traffic', {}).get(edge_key, 0)
             
-            # Apply congestion delay if traffic > 5
-            if traffic_count > 5:
+            # Apply weather-based congestion threshold
+            # Rain and snow make congestion worse (lower threshold)
+            weather_multiplier = self.city.weather.get_congestion_multiplier()
+            congestion_threshold = int(5 * weather_multiplier)
+            
+            # Apply congestion delay if traffic exceeds weather-adjusted threshold
+            if traffic_count > congestion_threshold:
                 self.congestion_delay = 1  # Wait one extra tick
                 return
             

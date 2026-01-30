@@ -13,6 +13,9 @@ class Simulation:
         self.occupancy = defaultdict(list)
         self.edge_traffic = defaultdict(int)
     def tick(self):
+        # Update weather conditions
+        self.city.update_weather(self.time)
+        
         self.occupancy.clear()
         self.edge_traffic.clear()
 
@@ -104,6 +107,9 @@ class WebSimulation(Simulation):
         subway_loop = self.city.subway_nodes
 
         road_stats = self.city.get_road_stats()
+        
+        # Get weather information
+        weather_info = self.city.weather.get_weather_info()
 
         return {
             'cityId': self.city_id,
@@ -114,7 +120,8 @@ class WebSimulation(Simulation):
             'stats': stats,
             'subway_loop': subway_loop,
             'grid_positions': self.city.grid_positions,
-            'road_stats': road_stats
+            'road_stats': road_stats,
+            'weather': weather_info
         }
 
     def run(self):

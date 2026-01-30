@@ -271,6 +271,69 @@
         .city-controls-hidden {
             display: none;
         }
+        
+        .weather-panel {
+            margin-top: 20px;
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 8px;
+            color: white;
+        }
+        
+        .weather-panel h3 {
+            margin-top: 0;
+            color: white;
+            font-size: 18px;
+        }
+        
+        .weather-type {
+            font-size: 24px;
+            font-weight: bold;
+            margin: 10px 0;
+            text-transform: capitalize;
+        }
+        
+        .weather-icon {
+            font-size: 48px;
+            text-align: center;
+            margin: 10px 0;
+        }
+        
+        .weather-effects {
+            margin-top: 10px;
+            font-size: 13px;
+        }
+        
+        .weather-effect-item {
+            padding: 5px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .weather-effect-item:last-child {
+            border-bottom: none;
+        }
+        
+        .weather-clear {
+            background: linear-gradient(135deg, #56CCF2 0%, #2F80ED 100%);
+        }
+        
+        .weather-rain {
+            background: linear-gradient(135deg, #4A5568 0%, #2D3748 100%);
+        }
+        
+        .weather-snow {
+            background: linear-gradient(135deg, #E0E7FF 0%, #C7D2FE 100%);
+            color: #1E293B;
+        }
+        
+        .weather-snow h3,
+        .weather-snow .weather-type {
+            color: #1E293B;
+        }
+        
+        .weather-heatwave {
+            background: linear-gradient(135deg, #F59E0B 0%, #DC2626 100%);
+        }
     </style>
 </head>
 <body>
@@ -384,6 +447,15 @@
                     <span id="totalPeople">0</span>
                 </div>
                 
+                <div id="weatherPanel" class="weather-panel" style="display: none;">
+                    <h3>🌤️ Weather Conditions</h3>
+                    <div class="weather-icon" id="weatherIcon">☀️</div>
+                    <div class="weather-type" id="weatherType">Clear</div>
+                    <div class="weather-effects">
+                        <div id="weatherEffects"></div>
+                    </div>
+                </div>
+                
                 <div class="road-stats">
                     <h3>Road Traffic (Current/Peak)</h3>
                     <div id="roadStatsContainer">
@@ -436,6 +508,11 @@
             document.getElementById('visiting').textContent = data.stats.visiting;
             document.getElementById('shopping').textContent = data.stats.shopping;
             document.getElementById('atAirport').textContent = data.stats.at_airport || 0;
+            
+            // Update weather display
+            if (data.weather) {
+                updateWeatherDisplay(data.weather);
+            }
 
             // Clear old positions for new city
             nodePositions.clear();
@@ -561,6 +638,40 @@
               .attr("stroke-width", 4);
           }
             updateRoadStats(data.road_stats || {});
+        }
+        
+        function updateWeatherDisplay(weather) {
+            const weatherPanel = document.getElementById('weatherPanel');
+            const weatherIcon = document.getElementById('weatherIcon');
+            const weatherType = document.getElementById('weatherType');
+            const weatherEffects = document.getElementById('weatherEffects');
+            
+            // Show weather panel
+            weatherPanel.style.display = 'block';
+            
+            // Update weather type and icon
+            weatherType.textContent = weather.type.charAt(0).toUpperCase() + weather.type.slice(1);
+            
+            // Set weather icon based on type
+            const icons = {
+                'clear': '☀️',
+                'rain': '🌧️',
+                'snow': '❄️',
+                'heatwave': '🔥'
+            };
+            weatherIcon.textContent = icons[weather.type] || '☀️';
+            
+            // Update panel background based on weather
+            weatherPanel.className = 'weather-panel weather-' + weather.type;
+            
+            // Display effects
+            if (weather.effects && weather.effects.length > 0) {
+                weatherEffects.innerHTML = weather.effects.map(effect => 
+                    `<div class="weather-effect-item">• ${effect}</div>`
+                ).join('');
+            } else {
+                weatherEffects.innerHTML = '<div class="weather-effect-item">• No special effects</div>';
+            }
         }
         
         function updateRoadStats(roadStats) {
