@@ -16,6 +16,10 @@ class Simulation:
         self.occupancy.clear()
         self.edge_traffic.clear()
 
+        # Update weather conditions
+        self.city.update_weather(self.time)
+        weather_effects = self.city.get_weather_effects()
+
         # First pass: count traffic for congestion calculation
         for p in self.people:
             if p.current_path and p.current_index < len(p.current_path) - 1:
@@ -23,6 +27,11 @@ class Simulation:
                 next_node = p.current_path[p.current_index + 1]
                 edge = tuple(sorted([current_node, next_node]))
                 self.edge_traffic[edge] += 1
+
+        # Apply rain congestion effect
+        if weather_effects['congestion_multiplier'] > 1.0:
+            for edge in self.edge_traffic:
+                self.edge_traffic[edge] = int(self.edge_traffic[edge] * weather_effects['congestion_multiplier'])
 
         # Update road traffic statistics
         self.city.update_road_traffic(self.edge_traffic)
@@ -105,6 +114,12 @@ class WebSimulation(Simulation):
 
         road_stats = self.city.get_road_stats()
 
+        # --- weather info ---
+        weather_info = {
+            'current_weather': self.city.weather,
+            'intensity': self.city.weather_intensity
+        }
+
         return {
             'cityId': self.city_id,
             'cityName': self.city_name,
@@ -114,7 +129,8 @@ class WebSimulation(Simulation):
             'stats': stats,
             'subway_loop': subway_loop,
             'grid_positions': self.city.grid_positions,
-            'road_stats': road_stats
+            'road_stats': road_stats,
+            'weather': weather_info
         }
 
     def run(self):

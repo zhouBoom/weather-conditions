@@ -1,6 +1,7 @@
 import networkx as nx
 import random
 import math
+import time
 
 class City:
     def __init__(self, home_count=40, work_count=20, subway_count=5, image_positions=None):
@@ -22,6 +23,11 @@ class City:
         self._build_city()
         self._initialize_roadworks()
         self._identify_roads()
+        # Weather system
+        self.weather = 'clear'
+        self.weather_intensity = 0
+        self.weather_transition = 0
+        self.weather_schedule = self._generate_weather_schedule()
 
     def _build_city(self):
         if self.image_positions:
@@ -514,6 +520,11 @@ class City:
         for i in range(len(path) - 1):
             edge_data = self.graph.get_edge_data(path[i], path[i+1])
             total_time += edge_data.get('weight', 5)
+        
+        # Apply snow transit time effect
+        weather_effects = self.get_weather_effects()
+        total_time = int(total_time * weather_effects['transit_time_multiplier'])
+        
         return total_time
 
     def is_roadworks(self, edge):
@@ -624,3 +635,81 @@ class City:
             'peak_traffic': info['peak_traffic'],
             'edge_count': len(info['edges'])
         } for name, info in self.roads.items()}
+    
+    def _generate_weather_schedule(self):
+        """Generate dynamic weather schedule throughout the day"""
+        schedule = []
+        current_time = 7 * 60  # 07:00
+        
+        while current_time <= 19 * 60:  # Until 19:00
+            weather_type = random.choice(['clear', 'rain', 'snow', 'heatwave'])
+            duration = random.randint(60, 240)  # 1-4 hours
+            intensity = random.randint(1, 3)  # 1-3 intensity
+            
+            schedule.append({
+                'start_time': current_time,
+                'end_time': current_time + duration,
+                'weather': weather_type,
+                'intensity': intensity
+            })
+            
+            current_time += duration
+        
+        return schedule
+    
+    def update_weather(self, current_time):
+        """Update weather based on current time"""
+        for weather_event in self.weather_schedule:
+            if weather_event['start_time'] <= current_time <= weather_event['end_time']:
+                self.weather = weather_event['weather']
+                self.weather_intensity = weather_event['intensity']
+                
+                # Apply heatwave roadworks effect
+                if self.weather == 'heatwave':
+                    self._update_heatwave_roadworks()
+                return
+        
+        # Default to clear if no weather event
+        self.weather = 'clear'
+        self.weather_intensity = 0
+    
+    def _update_heatwave_roadworks(self):
+        """Increase roadworks during heatwaves"""
+        weather_effects = self.get_weather_effects()
+        additional_roadworks = weather_effects['roadworks_increase']
+        
+        if additional_roadworks <= 0:
+            return
+        
+        # Only consider non-subway edges for roadworks
+        non_subway_edges = [edge for edge in self.graph.edges() 
+                           if not self.graph.get_edge_data(edge[0], edge[1]).get('is_subway', False)]
+        
+        # Filter out edges already with roadworks
+        available_edges = [edge for edge in non_subway_edges 
+                          if tuple(sorted(edge)) not in self.roadworks]
+        
+        if available_edges:
+            # Add additional roadworks
+            num_to_add = min(additional_roadworks, len(available_edges))
+            new_roadworks = random.sample(available_edges, num_to_add)
+            
+            for edge in new_roadworks:
+                self.roadworks.add(tuple(sorted(edge)))
+    
+    def get_weather_effects(self):
+        """Get current weather effects for simulation"""
+        effects = {
+            'congestion_multiplier': 1.0,
+            'transit_time_multiplier': 1.0,
+            'roadworks_increase': 0
+        }
+        
+        if self.weather == 'rain':
+            effects['congestion_multiplier'] = 1.0 + (self.weather_intensity * 0.2)
+        elif self.weather == 'snow':
+            effects['transit_time_multiplier'] = 2.0
+        elif self.weather == 'heatwave':
+            effects['roadworks_increase'] = self.weather_intensity * 2
+        
+        return effects
