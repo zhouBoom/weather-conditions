@@ -41,6 +41,17 @@ class Simulation:
             self.occupancy[loc].append(p)
 
         self.time += 5
+        
+        # Dynamic weather update
+        # 2% chance to change weather every tick (approx every 4 hours real-time feel, or very frequent in simulation time which is days in minutes?)
+        # 5 minutes per tick. 12 ticks = 1 hour. 2% ~ every 50 ticks ~ 4 hours.
+        if random.random() < 0.02:
+            weather_options = ['Clear', 'Rain', 'Snow', 'Heatwave']
+            # Weighted random to keep 'Clear' more common? 
+            # Let's keep it simple for now or maybe bias slightly towards Clear.
+            weights = [0.4, 0.2, 0.2, 0.2]
+            new_weather = random.choices(weather_options, weights=weights, k=1)[0]
+            self.city.set_weather(new_weather)
 
     def run(self):
         while self.time < self.end_time:
@@ -109,6 +120,7 @@ class WebSimulation(Simulation):
             'cityId': self.city_id,
             'cityName': self.city_name,
             'time': f"{self.time//60:02}:{self.time%60:02}",
+            'weather': self.city.weather,
             'nodes': nodes,
             'edges': edges,
             'stats': stats,
