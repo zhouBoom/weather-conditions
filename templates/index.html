@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-City Traffic Simulation</title>
+    <script src="https://cdn.socket.io/3.1.3/socket.io.min.js"></script>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .controls {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .controls h2 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .control-group {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 10px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        
+        .control-group input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            width: 80px;
+        }
+        
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+        }
+        
+        button:hover {
+            background-color: #0056b3;
+        }
+        
+        button:disabled {
+            background-color: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .simulation-area {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .visualization {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            flex: 1;
+        }
+        
+        .stats {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            width: 250px;
+        }
+        
+        .stats h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .stat-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .time-display {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        #network {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        
+        .legend {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        .legend-item {
+            display: inline-block;
+            margin-right: 20px;
+            margin-bottom: 5px;
+        }
+        
+        .legend-color {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            margin-right: 5px;
+            vertical-align: middle;
+            border-radius: 50%;
+        }
+        
+        .legend-line {
+            display: inline-block;
+            width: 20px;
+            height: 3px;
+            margin-right: 5px;
+            vertical-align: middle;
+        }
+        
+        .status {
+            padding: 10px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            text-align: center;
+            font-weight: bold;
+        }
+        
+        .status.running {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status.stopped {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .road-stats {
+            margin-top: 20px;
+        }
+        
+        .road-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 8px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        
+        .road-name {
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .road-traffic {
+            color: #007bff;
+            font-weight: bold;
+        }
+        
+        .simulation-area {
+            display: flex;
+            gap: 20px;
+        }
+        
+        .stats-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .city-tabs {
+            background: white;
+            padding: 10px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .city-tab {
+            display: inline-block;
+            padding: 10px 20px;
+            margin-right: 10px;
+            background-color: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .city-tab.active {
+            background-color: #007bff;
+            color: white;
+            border-color: #007bff;
+        }
+        
+        .city-tab:hover {
+            background-color: #e9ecef;
+        }
+        
+        .city-tab.active:hover {
+            background-color: #0056b3;
+        }
+        
+        .city-config {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+            background-color: #f8f9fa;
+        }
+        
+        .city-config h4 {
+            margin-top: 0;
+            color: #333;
+        }
+        
+        .city-config-controls {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .num-cities-control {
+            margin-bottom: 20px;
+        }
+        
+        .city-name-input {
+            width: 150px;
+            margin-bottom: 10px;
+        }
+        
+        .city-controls-hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Multi-City Traffic Simulation</h1>
+        
+        <div class="controls">
+            <h2>Simulation Controls</h2>
+            
+            <div class="num-cities-control">
+                <label for="numCities">Number of Cities:</label>
+                <input type="number" id="numCities" value="1" min="1" max="5" onchange="updateCityConfigs()">
+            </div>
+            
+            <div id="cityConfigs">
+                <!-- City configurations will be generated here -->
+            </div>
+
+            <button id="startBtn" onclick="startSimulation()">Start All Simulations</button>
+            <button id="stopBtn" onclick="stopAllSimulations()" disabled>Stop All Simulations</button>
+        </div>
+        
+        <div id="status" class="status stopped">No Simulations Running</div>
+        
+        <div id="cityTabs" class="city-tabs" style="display: none;">
+            <h3>Active Cities:</h3>
+            <div id="tabsContainer"></div>
+        </div>
+        
+        <div class="simulation-area">
+            <div class="visualization">
+                <h3 id="currentCityTitle">Network Visualization</h3>
+                <svg id="network"></svg>
+                <div class="legend">
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #87CEEB;"></span>
+                        Homes
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #FFA500;"></span>
+                        Workplaces
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #90EE90;"></span>
+                        Shops
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-line" style="background-color: #800080; height: 4px;"></span>
+                        Subway Lines
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #FFFFFF; border: 2px solid #000000;"></span>
+                        Subway Stations
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #FF69B4;"></span>
+                        Apartments
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-color" style="background-color: #4169E1;"></span>
+                        Airport
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-line" style="background-color: #FF0000; height: 4px;"></span>
+                        Heavy Traffic (&gt;5)
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-line" style="background-color: #FFA500; height: 3px;"></span>
+                        Medium Traffic (3-5)
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-line" style="background-color: #FFFF00; height: 2px;"></span>
+                        Light Traffic (1-2)
+                    </div>
+                    <div class="legend-item">
+                        <span class="legend-line" style="background-color: #8B4513; height: 2px;"></span>
+                        Roadworks
+                    </div>
+                </div>
+            </div>
+            
+            <div class="stats">
+                <div class="time-display" id="timeDisplay">--:--</div>
+                <h3>Statistics</h3>
+                <div class="stat-item">
+                    <span>At Home:</span>
+                    <span id="atHome">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>At Work:</span>
+                    <span id="atWork">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Travelling:</span>
+                    <span id="travelling">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Visiting:</span>
+                    <span id="visiting">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Shopping:</span>
+                    <span id="shopping">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>At Airport:</span>
+                    <span id="atAirport">0</span>
+                </div>
+                <div class="stat-item">
+                    <span>Total People:</span>
+                    <span id="totalPeople">0</span>
+                </div>
+                
+                <div class="road-stats">
+                    <h3>Road Traffic (Current/Peak)</h3>
+                    <div id="roadStatsContainer">
+                        <p>No data available</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        let isRunning = false;
+        let activeCities = {};
+        let currentCityId = null;
+        let cityDataCache = {};
+
+        const svg = d3.select("#network").attr("width", 800).attr("height", 600);
+        let nodes = [], links = [];
+        let nodePositions = new Map();
+        let nodeElements, linkElements;
+
+        function calculateGridLayout(nodes, gridPositions) {
+            const width = 800, height = 600;
+            const padding = 50;
+            const usableWidth = width - 2 * padding;
+            const usableHeight = height - 2 * padding;
+            let minRow = Infinity, maxRow = -Infinity;
+            let minCol = Infinity, maxCol = -Infinity;
+            for (const pos of Object.values(gridPositions)) { const [r,c] = pos; minRow=Math.min(minRow,r); maxRow=Math.max(maxRow,r); minCol=Math.min(minCol,c); maxCol=Math.max(maxCol,c);}            
+            const gridW = maxCol-minCol;
+            const gridH = maxRow-minRow;
+            const cellW = gridW>0? usableWidth/gridW: usableWidth;
+            const cellH = gridH>0? usableHeight/gridH: usableHeight;
+            for (const [id,pos] of Object.entries(gridPositions)) {
+                const [r,c]=pos;
+                nodePositions.set(id,{ x: padding+(c-minCol)*cellW, y: padding+(r-minRow)*cellH });
+            }
+        }
+        function initializeVisualization() {
+            linkElements = svg.selectAll(".link");
+            nodeElements = svg.selectAll(".node");
+        }
+
+        function updateVisualization(data) {
+            document.getElementById('timeDisplay').textContent = data.time;
+            document.getElementById('atHome').textContent = data.stats.at_home;
+            document.getElementById('atWork').textContent = data.stats.at_work;
+            document.getElementById('travelling').textContent = data.stats.travelling;
+            document.getElementById('visiting').textContent = data.stats.visiting;
+            document.getElementById('shopping').textContent = data.stats.shopping;
+            document.getElementById('atAirport').textContent = data.stats.at_airport || 0;
+
+            // Clear old positions for new city
+            nodePositions.clear();
+            nodes = data.nodes;
+            links = data.edges;
+
+            if (data.grid_positions) {
+                calculateGridLayout(nodes, data.grid_positions);
+            } else {
+                calculateStaticLayout(nodes);
+            }
+        
+          const centerX = +svg.attr("width") / 2;
+          const centerY = +svg.attr("height") / 2;
+        
+          // --- 3) Draw road (and other non-subway) edges ---
+          const roadLinks = links.filter(d => !d.is_subway);
+          linkElements = svg.selectAll(".link")
+            .data(roadLinks, d => d.source + "-" + d.target);
+          linkElements.exit().remove();
+          const linkEnter = linkElements.enter().append("line").attr("class", "link");
+          linkElements = linkEnter.merge(linkElements)
+            .attr("stroke", d => {
+              if (d.roadworks)      return "#8B4513";
+              return d.traffic > 5  ? "#FF0000"
+                   : d.traffic > 2  ? "#FFA500"
+                   : d.traffic > 0  ? "#FFFF00"
+                                    : "#CCCCCC";
+            })
+            .attr("stroke-width", d => {
+              return d.traffic > 5  ? 4
+                   : d.traffic > 2  ? 3
+                   : d.traffic > 0  ? 2
+                                    : 1;
+            })
+            .attr("stroke-dasharray", d => d.roadworks ? "5,5" : null)
+            .attr("x1", d => nodePositions.get(d.source).x)
+            .attr("y1", d => nodePositions.get(d.source).y)
+            .attr("x2", d => nodePositions.get(d.target).x)
+            .attr("y2", d => nodePositions.get(d.target).y);
+        
+          // --- 4) Draw nodes ---
+          nodeElements = svg.selectAll(".node")
+            .data(nodes, d => d.id);
+          nodeElements.exit().remove();
+          const nodeEnter = nodeElements.enter()
+            .append("circle")
+            .attr("class", "node");
+          nodeElements = nodeEnter.merge(nodeElements)
+              .attr("r", d => d.is_subway ? 10 : 8)
+              .attr("fill", d =>
+                d.type === 'home' ? '#87CEEB' :
+                d.type === 'work' ? '#FFA500' :
+                d.type === 'shop' ? '#90EE90' :
+                d.type === 'apartment' ? '#FF69B4' :
+                d.type === 'airport' ? '#4169E1' :
+                                    '#90EE90'
+              )
+              .attr("stroke", d => d.is_subway ? "#000000" : "#333333")
+              .attr("stroke-width", d => {
+                if (d.is_subway) return 2;
+                if (d.type === 'apartment' || d.type === 'airport') return 1; // FIXED: Always thin borders for apartments and airport
+                return Math.max(1, Math.min(3, d.occupancy / 2)); // Cap all other nodes at 3px max
+              })
+              .attr("cx", d => nodePositions.get(d.id).x)
+              .attr("cy", d => nodePositions.get(d.id).y);
+        
+          // --- 5) Draw occupancy labels ---
+          const labelElements = svg.selectAll(".label")
+            .data(nodes, d => d.id);
+          labelElements.exit().remove();
+          const labelEnter = labelElements.enter()
+            .append("text")
+            .attr("class", "label")
+            .attr("text-anchor", "middle")
+            .attr("dy", 4)
+            .style("font-size", "10px")
+            .style("fill", "#333");
+          labelEnter.merge(labelElements)
+            .text(d => d.occupancy > 0 ? d.occupancy : "")
+            .attr("x", d => nodePositions.get(d.id).x)
+            .attr("y", d => nodePositions.get(d.id).y);
+        
+          // --- 6) Draw subway lines in proper angular order ---
+          svg.selectAll(".subway-loop-line").remove();
+        
+          const subwayStations = nodes
+            .filter(d => d.is_subway)
+            .map(d => {
+              const pos = nodePositions.get(d.id);
+              return { id: d.id, x: pos.x, y: pos.y };
+            });
+        
+          if (subwayStations.length >= 3) {
+            // Calculate center point of all subway stations
+            const centerX = subwayStations.reduce((sum, s) => sum + s.x, 0) / subwayStations.length;
+            const centerY = subwayStations.reduce((sum, s) => sum + s.y, 0) / subwayStations.length;
+            
+            // Sort subway stations by angle from center point
+            const sortedStations = subwayStations.map(station => {
+              const angle = Math.atan2(station.y - centerY, station.x - centerX);
+              return { ...station, angle };
+            }).sort((a, b) => a.angle - b.angle);
+        
+            // Create subway loop connections between adjacent stations (in angular order)
+            const subwayPairs = [];
+            for (let i = 0; i < sortedStations.length; i++) {
+              const curr = sortedStations[i];
+              const next = sortedStations[(i + 1) % sortedStations.length];
+              subwayPairs.push({ x1: curr.x, y1: curr.y, x2: next.x, y2: next.y });
+            }
+        
+            svg.selectAll(".subway-loop-line")
+              .data(subwayPairs)
+              .enter()
+              .append("line")
+              .attr("class", "subway-loop-line")
+              .attr("x1", d => d.x1)
+              .attr("y1", d => d.y1)
+              .attr("x2", d => d.x2)
+              .attr("y2", d => d.y2)
+              .attr("stroke", "#800080")
+              .attr("stroke-width", 4);
+          }
+            updateRoadStats(data.road_stats || {});
+        }
+        
+        function updateRoadStats(roadStats) {
+            const container = document.getElementById('roadStatsContainer');
+            
+            if (Object.keys(roadStats).length === 0) {
+                container.innerHTML = '<p>No road data available</p>';
+                return;
+            }
+            
+            // Sort roads by current traffic (descending), then by name
+            const sortedRoads = Object.entries(roadStats).sort((a, b) => {
+                const [nameA, infoA] = a;
+                const [nameB, infoB] = b;
+                
+                // Sort by current traffic first (highest first)
+                if (infoB.current_traffic !== infoA.current_traffic) {
+                    return infoB.current_traffic - infoA.current_traffic;
+                }
+                
+                // If current traffic is the same, sort by road type and name
+                if (infoA.type !== infoB.type) {
+                    return infoA.type === 'street' ? -1 : 1;
+                }
+                
+                // Within same type, sort numerically by road number
+                const numA = parseInt(nameA.match(/\d+/)[0]);
+                const numB = parseInt(nameB.match(/\d+/)[0]);
+                return numA - numB;
+            });
+            
+            container.innerHTML = sortedRoads.map(([roadName, roadInfo]) => `
+                <div class="road-item">
+                    <span class="road-name">${roadName}</span>
+                    <span class="road-traffic">${roadInfo.current_traffic} / ${roadInfo.peak_traffic}</span>
+                </div>
+            `).join('');
+        }
+
+        function calculateStaticLayout(nodes) {
+            // Fallback circular layout (existing code)
+            const centerX = 800 / 2, centerY = 600 / 2;
+            const radius = Math.min(800, 600) * 0.3;
+            const homes = nodes.filter(n => n.type === 'home');
+            const works = nodes.filter(n => n.type === 'work');
+            const shops = nodes.filter(n => n.type === 'shop');
+
+            homes.forEach((n,i) => {
+                const angle = (i / homes.length) * 2 * Math.PI;
+                nodePositions.set(n.id, {
+                    x: centerX + radius * Math.cos(angle),
+                    y: centerY + radius * Math.sin(angle)
+                });
+            });
+            works.forEach((n,i) => {
+                const angle = (i / works.length) * 2 * Math.PI;
+                nodePositions.set(n.id, {
+                    x: centerX + radius*0.5 * Math.cos(angle),
+                    y: centerY + radius*0.5 * Math.sin(angle)
+                });
+            });
+            shops.forEach((n,i) => {
+                const angle = (i / shops.length) * 2 * Math.PI;
+                nodePositions.set(n.id, {
+                    x: centerX + radius*0.75 * Math.cos(angle),
+                    y: centerY + radius*0.75 * Math.sin(angle)
+                });
+            });
+        }
+
+        function updateCityConfigs() {
+            const numCities = parseInt(document.getElementById('numCities').value);
+            const container = document.getElementById('cityConfigs');
+            
+            container.innerHTML = '';
+            
+            for (let i = 1; i <= numCities; i++) {
+                const cityConfig = document.createElement('div');
+                cityConfig.className = 'city-config';
+                cityConfig.innerHTML = `
+                    <h4>City ${i} Configuration</h4>
+                    <div class="city-config-controls">
+                        <div class="control-group">
+                            <label>City Name:</label>
+                            <input type="text" class="city-name-input" value="City ${i}" data-city="${i}">
+                        </div>
+                        <div class="control-group">
+                            <label>Homes:</label>
+                            <input type="number" value="40" min="10" max="100" data-city="${i}" data-field="homes">
+                        </div>
+                        <div class="control-group">
+                            <label>Workplaces:</label>
+                            <input type="number" value="20" min="5" max="50" data-city="${i}" data-field="works">
+                        </div>
+                        <div class="control-group">
+                            <label>Subway Stations:</label>
+                            <input type="number" value="5" min="0" max="30" data-city="${i}" data-field="subways">
+                        </div>
+                        <div class="control-group">
+                            <label>City Map Image (optional):</label>
+                            <input type="file" accept="image/*" data-city="${i}" data-field="mapImage" onchange="handleCityImageUpload(event, ${i})">
+                            <div id="imagePreview${i}" style="display: none; margin-top: 10px;">
+                                <img id="previewImg${i}" style="max-width: 150px; max-height: 100px; border: 1px solid #ddd; border-radius: 4px;">
+                                <button type="button" onclick="clearCityImage(${i})" style="margin-left: 10px; background-color: #dc3545;">Clear</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(cityConfig);
+            }
+        }
+
+        function handleCityImageUpload(event, cityIndex) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById(`imagePreview${cityIndex}`);
+                const img = document.getElementById(`previewImg${cityIndex}`);
+                img.src = e.target.result;
+                preview.style.display = 'block';
+                
+                // Store image data
+                event.target.imageData = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearCityImage(cityIndex) {
+            const input = document.querySelector(`input[data-city="${cityIndex}"][data-field="mapImage"]`);
+            input.value = '';
+            input.imageData = null;
+            document.getElementById(`imagePreview${cityIndex}`).style.display = 'none';
+        }
+
+        function startSimulation() {
+            const numCities = parseInt(document.getElementById('numCities').value);
+            const citiesConfig = [];
+            
+            for (let i = 1; i <= numCities; i++) {
+                const nameInput = document.querySelector(`input.city-name-input[data-city="${i}"]`);
+                const homesInput = document.querySelector(`input[data-city="${i}"][data-field="homes"]`);
+                const worksInput = document.querySelector(`input[data-city="${i}"][data-field="works"]`);
+                const subwaysInput = document.querySelector(`input[data-city="${i}"][data-field="subways"]`);
+                const imageInput = document.querySelector(`input[data-city="${i}"][data-field="mapImage"]`);
+                
+                const config = {
+                    name: nameInput.value,
+                    homes: parseInt(homesInput.value),
+                    works: parseInt(worksInput.value),
+                    subways: parseInt(subwaysInput.value)
+                };
+                
+                if (imageInput && imageInput.imageData) {
+                    config.mapImage = imageInput.imageData;
+                }
+                
+                citiesConfig.push(config);
+            }
+            
+            socket.emit('start_simulation', {
+                numCities: numCities,
+                citiesConfig: citiesConfig
+            });
+        }
+
+        function stopAllSimulations() {
+            socket.emit('stop_simulation');
+        }
+
+        function switchToCity(cityId) {
+            currentCityId = cityId;
+            
+            // Update active tab
+            document.querySelectorAll('.city-tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-city-id="${cityId}"]`).classList.add('active');
+            
+            // Update title
+            const cityName = activeCities[cityId].name;
+            document.getElementById('currentCityTitle').textContent = `${cityName} - Network Visualization`;
+            
+            // Request fresh data for this city
+            socket.emit('get_city_data', { cityId: cityId });
+        }
+
+        function updateCityTabs() {
+            const tabsContainer = document.getElementById('tabsContainer');
+            const cityTabsDiv = document.getElementById('cityTabs');
+            
+            if (Object.keys(activeCities).length === 0) {
+                cityTabsDiv.style.display = 'none';
+                return;
+            }
+            
+            cityTabsDiv.style.display = 'block';
+            tabsContainer.innerHTML = '';
+            
+            Object.entries(activeCities).forEach(([cityId, cityInfo]) => {
+                const tab = document.createElement('div');
+                tab.className = 'city-tab';
+                tab.setAttribute('data-city-id', cityId);
+                tab.textContent = cityInfo.name;
+                tab.onclick = () => switchToCity(cityId);
+                
+                if (cityId === currentCityId) {
+                    tab.classList.add('active');
+                }
+                
+                tabsContainer.appendChild(tab);
+            });
+        }
+
+        // Socket event handlers
+        socket.on('simulations_started', data => {
+            isRunning = true;
+            document.getElementById('startBtn').disabled = true;
+            document.getElementById('stopBtn').disabled = false;
+            document.getElementById('status').textContent = `Running ${data.cities.length} Cities`;
+            document.getElementById('status').className = 'status running';
+            
+            // Store active cities
+            activeCities = {};
+            data.cities.forEach(city => {
+                activeCities[city.id] = city;
+            });
+            
+            // Set first city as current
+            if (data.cities.length > 0) {
+                currentCityId = data.cities[0].id;
+            }
+            
+            updateCityTabs();
+            nodePositions.clear();
+        });
+
+        socket.on('all_simulations_stopped', () => {
+            isRunning = false;
+            document.getElementById('startBtn').disabled = false;
+            document.getElementById('stopBtn').disabled = true;
+            document.getElementById('status').textContent = 'All Simulations Stopped';
+            document.getElementById('status').className = 'status stopped';
+            
+            activeCities = {};
+            currentCityId = null;
+            updateCityTabs();
+        });
+
+        socket.on('city_simulation_update', data => {
+            if (data.cityId === currentCityId) {
+                try { 
+                    updateVisualization(data); 
+                } catch (err) { 
+                    console.error(err); 
+                }
+            }
+            
+            // Cache the data for quick switching
+            cityDataCache[data.cityId] = data;
+        });
+
+        socket.on('city_data_update', data => {
+            if (data.cityId === currentCityId) {
+                try { 
+                    updateVisualization(data.data); 
+                } catch (err) { 
+                    console.error(err); 
+                }
+            }
+        });
+
+        socket.on('city_simulation_completed', data => {
+            if (activeCities[data.cityId]) {
+                activeCities[data.cityId].completed = true;
+            }
+        });
+
+        socket.on('error', data => {
+            alert('Error: ' + data.message);
+        });
+
+        // Initialize
+        updateCityConfigs();
+        initializeVisualization();
+    </script>
+</body>
+</html>

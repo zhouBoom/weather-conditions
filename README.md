@@ -1,0 +1,1 @@
+To run the game, just run the main.py file!
